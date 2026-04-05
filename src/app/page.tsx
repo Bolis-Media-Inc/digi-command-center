@@ -85,23 +85,31 @@ export default function Dashboard() {
 
     // Subscribe to agent_runs changes
     const runsSubscription = supabase
-      .from(`agent_runs:agent_id=in.(${agents.map(a => `${a.id}`).join(',')})`)
-      .on('*', (payload) => {
-        if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-          setRuns(prev => ({
-            ...prev,
-            [payload.new.agent_id]: payload.new
-          }))
+      .channel('agent_runs_changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'agent_runs' },
+        (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            setRuns(prev => ({
+              ...prev,
+              [payload.new.agent_id]: payload.new
+            }))
+          }
         }
-      })
+      )
       .subscribe()
 
     // Subscribe to agent_logs
     const logsSubscription = supabase
-      .from('agent_logs')
-      .on('INSERT', (payload) => {
-        setLogs(prev => [...prev, payload.new as AgentLog].slice(-50))
-      })
+      .channel('agent_logs_changes')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'agent_logs' },
+        (payload) => {
+          setLogs(prev => [...prev, payload.new as AgentLog].slice(-50))
+        }
+      )
       .subscribe()
 
     return () => {
